@@ -9,7 +9,7 @@ import pandas as pd
 
 # load base trajectory. this takes the .prmtop file made during the initial md setup as this helps greatly with accurate hydrogen bond occupancy prediction. using the solvated_system.pdb file can still work for rmsd, rmsf, and other calculations.
 
-u = mda.Universe('solvated_system.prmtop', 'trajectory.dcd')
+u = mda.Universe('solvated_system.prmtop', 'trajectory_centered.dcd')
 
 # optional, used for troubleshooting. verifies that your protein and ligand were properly imported and not subdivided.
 print(len(u.select_atoms('protein').fragments))
@@ -19,7 +19,8 @@ print(len(u.select_atoms('not (resname HOH WAT NA CL K)').fragments))
 protein_and_ligand = u.select_atoms('not (resname HOH WAT NA CL)')
 
 # note the unwrap function. since md is done with periodic boundary conditions, the protein will occasionally cross the boundary of the container and appear on the other side. unwrapping centers/anchors the protein which helps some of the calculations be performed properly. there is a separate unwrapping script if you want to just unwrap the trajectory and view it as is, without going through all this analysis.
-u.trajectory.add_transformations(transformations.unwrap(protein_and_ligand))
+# this is only necessary if you did not unwrap the trajectory already with unwrap.py. if you did not do so, change every instance of trajectory_centered.dcd to trajectory.dcd and uncomment the next code line.
+# u.trajectory.add_transformations(transformations.unwrap(protein_and_ligand))
 protein = u.select_atoms('protein')
 
 # optional, can take out, used this for troubleshooting. verifies that this script can actually read the first 5 frames of your trajectory and times how long that process takes. 
@@ -43,7 +44,7 @@ for ts in u.trajectory:
     rg_values.append((protein.radius_of_gyration()))
 
 # load the trajectory into MDTraj for further analysis.
-t = md.load('trajectory.dcd', top='solvated_system.prmtop')
+t = md.load('trajectory_centered.dcd', top='solvated_system.prmtop')
 protein_indices = t.topology.select('protein')
 t_protein = t.atom_slice(protein_indices)
 
@@ -75,7 +76,7 @@ print("Successfully calculated RMSD, SASA, and radius of gyration.")
 
 # calculate root mean square fluctuation per residue (RMSF) showing how much each individual residue moves over time.
 prealigner = align.AlignTraj(u, u, select='protein and name CA', in_memory=True).run()
-average = mda.Universe('solvated_system.prmtop', 'trajectory.dcd') # reference
+average = mda.Universe('solvated_system.prmtop', 'trajectory_centered.dcd') # reference
 calphas = u.select_atoms('protein and name CA')
 rmsfer = rms.RMSF(calphas).run()
 rmsf_data = rmsfer.results.rmsf
