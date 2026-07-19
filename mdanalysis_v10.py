@@ -8,6 +8,7 @@ import numpy as np
 import pandas as pd
 
 # load base trajectory. this takes the .prmtop file made during the initial md setup as this helps greatly with accurate hydrogen bond occupancy prediction. using the solvated_system.pdb file can still work for rmsd, rmsf, and other calculations.
+# trajectory_centered.dcd is the input. this is what is produced by unwrap_v2.py (fixes the issue of the protein passing through periodic boundary conditions and appearing on the other side, which can inflate RMSF values because it looks like some amino acids are suddenly moving a lot more than normal. you can also use cpptraj to image the trajectory and my output values looked the same regardless of whether it was imaged by cpptraj or unwrapped.
 
 u = mda.Universe('solvated_system.prmtop', 'trajectory_centered.dcd')
 
@@ -17,10 +18,6 @@ print(len(u.select_atoms('not (resname HOH WAT NA CL K)').fragments))
 
 # selects only the enzyme and substrate for most downstream analysis rather than the water molecules and ions. probably unnecessary, used for troubleshooting. don't delete, need to look back at older versions and see what this used to be.
 protein_and_ligand = u.select_atoms('not (resname HOH WAT NA CL)')
-
-# note the unwrap function. since md is done with periodic boundary conditions, the protein will occasionally cross the boundary of the container and appear on the other side. unwrapping centers/anchors the protein which helps some of the calculations be performed properly. there is a separate unwrapping script if you want to just unwrap the trajectory and view it as is, without going through all this analysis.
-# this is only necessary if you did not unwrap the trajectory already with unwrap.py. if you did not do so, change every instance of trajectory_centered.dcd to trajectory.dcd and uncomment the next code line.
-# u.trajectory.add_transformations(transformations.unwrap(protein_and_ligand))
 protein = u.select_atoms('protein')
 
 # optional, can take out, used this for troubleshooting. verifies that this script can actually read the first 5 frames of your trajectory and times how long that process takes. 
@@ -100,7 +97,9 @@ np.savetxt('secondary_structure_dssp.txt', dssp_matrix, fmt='%s', delimiter=' ')
 
 # calculate radial distribution function, g(r) or sometimes noted as rdf, which looks at the spatial distribution of water molecules around the substrate.
 ligand = u.select_atoms('resname ROH 4YB 0YB')
-is_water_o = u.select_atoms('resname HOH and name O')
+is_water_o = u.select_atoms('(resname HOH WAT SOL) and name O')
+
+print(f"RDF Target - Ligand atoms: {len(ligand)}, Water Oxygen atoms: {len(is_water_o)}")
 
 rdf = InterRDF(ligand, is_water_o, nbins=75, range=(0.0, 15.0))
 rdf.run()
