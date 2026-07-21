@@ -1,9 +1,18 @@
-cat << EOF > mmpbsa.in
+#change to match your number of frames in your trajectory and how many of those frames you want to analyze
 &general
    startframe=1, endframe=500, interval=5,
    verbose=1, keep_files=0,
 /
+#for MM/GBSA. igb=5 matches mbondi2 atomic radius. saltcon=0.150 should match the molarity of your NaCl in molar.
 &gb
-   igb=8, saltcon=0.150,
+   igb=5, saltcon=0.150,
+/
+#for MM/PBSA. istrng=150 matches the molarity of your salt in millimolar.  inp=1 is the default nonpolar solvation model.
+#radiopt=0 means use the atomic radii specified in the prmtop file which I did because my substrate is a carbohydrate and its force field is GLYCAM06.
+#indi is the internal dielectric constant, i set it to 2.0 for highly polar substrates but the default is often 1.0.
+&pb
+   inp=1, istrng=150.0,
+   indi=2.0,
+   radiopt=0,
 /
 EOF
