@@ -11,12 +11,18 @@ These are then used for downstream analysis to obtain useful information about t
 5) **Solvent-accessible surface area (SASA)** - the surface area of the protein that is accessible to solvent, in this case, water.
 6) **Hydrogen bond occupancy** - given that both the enzyme (or receptor) and ligand (or substrate) has residues that may act as hydrogen bond donors or acceptors, what are the hydrogen bonds formed within the system, and what percent of the time are they (each donor/acceptor pair) close enough to be considered a hydrogen bond?
 
-In addition, you may also run mm_g-pbsa-prep.py. This takes a .prmtop file as input (generated during the molecular dynamics run in addition to the solvated_system.pdb file). It isolates the enzyme alone, substrate alone, and complex, all without water or ions. It also removes water from the trajectory_centered.dcd file. These components are then used for MM-PBSA and/or MM-GBSA, which estimates the binding energy of the complex (more specifically, ΔG). You may read more about these methods at the following references: Genheden & Ryde in 2015 (https://doi.org/10.1517/17460441.2015.1032936), Yau et al. in 2024 (https://doi.org/10.1007/s00894-024-06189-4), or Tuccinardi in 2021 (https://doi.org/10.1080/17460441.2021.1942836).
+**For calculating MM/PBSA**
+Molecular mechanics/Poisson Boltzmann Surface Area (MM/PBSA) and molecular mechanics/Generalized Born Surface Area (MM/GBSA) are ways of measuring the ΔG of binding of the substrate to the enzyme, calculated via ΔGbinding = ΔGcomplex - ΔGenzyme - ΔGsubstrate. This is only an estimate and it's more interpreted as a trend across samples or conditions rather than as absolute values. You may read more about these methods at the following references: Genheden & Ryde in 2015 (https://doi.org/10.1517/17460441.2015.1032936), Yau et al. in 2024 (https://doi.org/10.1007/s00894-024-06189-4), or Tuccinardi in 2021 (https://doi.org/10.1080/17460441.2021.1942836).
 
-1) **Molecular mechanics/Generalized Born Surface Area (MM-GBSA)** is quicker and easier to calculate because it runs through OpenMM using Python script, mm-gbsa.py. Both methods go through the trajectory frame by frame determining energy and ultimately calculating ΔGbinding = ΔGcomplex - ΔGenzyme - ΔGsubstrate.
-2) **Molecular mechanics/Poisson Boltzmann Surface Area (MM-PBSA)** is more computationally expensive and can run into some errors because it's done through MMPBSA.py in Amber, which had some compatibiliy/formatting issues with the workflow I had earlier that I needed to fix, such as removing the periodiic boundary box information. You need to set up a mmpbsa.in file and run it through the command line. However, it is considered to be more accurate by some authors and it gives more detailed information that is helpful for troubleshooting, like showing the van der Waals vs. electrostatic contributions to total energy.
-3) The choice of which one is better than the other depends on your system. It's recommended you try both. A similar trend across conditions gives you more confidence in the validity of your system.
-4) It's possible to look at the enzyme residue by residue and see which residue contributes most to ΔG but this can take hours whereas taking an overall snapshot takes minutes. Will add in the future.
+To calculate it, the easiest way is to use mmpbsa.in which is the configuration file for using MMPBSA.py, a script included in Amber. This occurs after molecular dynamics. You must first run mm_g-pbsa-prep.py. This takes a .prmtop file as input (generated during the molecular dynamics run using ParmED in addition to the solvated_system.pdb file). It isolates the enzyme alone, substrate alone, and complex, all without water or ions. It also removes water from the trajectory_centered.dcd file.
+
+Once that is done, customize your mmpbsa.in file to either calculate MM/GBSA (quicker but less rigorous), MM/PBSA (more intensive), or both (recommended to try both at first for your system). You can also do per-residue decomposition to determine which residues are contributing most to the ΔG. Then run:
+
+MMPBSA.py -O -i mmpbsa.in -cp complex.prmtop -rp enzyme.prmtop -lp substrate.prmtop -y trajectory_no-solvent.nc > mmpbsa.log 2>&1 &
+
+For parallel processing with multiple CPU cores (by default it just uses one core):
+
+mpirun -np 8 MMPBSA.py.MPI -O -i mmpbsa.in -cp complex.prmtop -rp enzyme.prmtop -lp substrate.prmtop -y trajectory_no-solvent.nc > mmpbsa.log 2>&1 &
 
 Future additions:
 1) Need to add distance to scissile bond or other more targeted distances worth tracking.
