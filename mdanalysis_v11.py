@@ -72,12 +72,18 @@ print("Saved time-series properties to trajectory_time_series_summary.csv")
 print("Successfully calculated RMSD, SASA, and radius of gyration.")
 
 # calculate root mean square fluctuation per residue (RMSF) showing how much each individual residue moves over time.
-prealigner = align.AlignTraj(u, u, select='protein and name CA', in_memory=True).run()
-average = mda.Universe('solvated_system.prmtop', 'trajectory_centered.dcd') # reference
-calphas = u.select_atoms('protein and name CA')
+u_aligned = mda.Universe('solvated_system.prmtop', 'trajectory_centered.dcd')
+
+# first pass: align to frame 0, compute the average structure
+average = align.AverageStructure(u_aligned, u_aligned, select='protein and name CA', ref_frame=0).run()
+ref = average.results.universe
+
+# second pass: re-align everything to the average structure instead of frame 0
+align.AlignTraj(u_aligned, ref, select='protein and name CA', in_memory=True).run()
+
+calphas = u_aligned.select_atoms('protein and name CA')
 rmsfer = rms.RMSF(calphas).run()
 rmsf_data = rmsfer.results.rmsf
-
 # export RMSF values by creating an array of residue numbers from N->C terminus, combining residue numbers and RMSF values, and saving as a text file
 import numpy as np
 residue_numbers = calphas.resids  
@@ -85,7 +91,6 @@ rmsf_output = np.column_stack((residue_numbers, rmsf_data))
 np.savetxt('protein_rmsf.dat', rmsf_output, 
            header='Residue_ID Fluctuation_A', 
            fmt='%d %.4f')
-
 print("Successfully calculated RMSF.")
 
 # calculate Define Secondary Structure of Proteins (DSSP). the explanation of each code is given at https://biopython.org/docs/1.76/api/Bio.PDB.DSSP.html. note that 'C' is used as a placeholder for 'unable to predict'. need to refine as there have been updates to DSSP (see Hekkelman et al., 2025, doi 10.1002/pro.70208) and some issues with the default naming structure.
@@ -121,12 +126,12 @@ protein_sel = 'protein'
 ligand_sel = 'resname ROH 4YB 0YB'
 hb_protein_donor = HydrogenBondAnalysis(
     universe=u, donors_sel=protein_sel, acceptors_sel=ligand_sel,
-    hydrogens_sel='element H', d_a_cutoff=3.5, d_h_a_angle_cutoff=120.0
+    hydrogens_sel='element H', d_a_cutoff=3.5, d_h_a_angle_cutoff=150.0
 )
 hb_protein_donor.run()
 hb_ligand_donor = HydrogenBondAnalysis(
     universe=u, donors_sel=ligand_sel, acceptors_sel=protein_sel,
-    hydrogens_sel='element H', d_a_cutoff=3.5, d_h_a_angle_cutoff=120.0
+    hydrogens_sel='element H', d_a_cutoff=3.5, d_h_a_angle_cutoff=150.0
 )
 hb_ligand_donor.run()
 
