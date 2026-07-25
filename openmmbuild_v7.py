@@ -10,12 +10,12 @@ import sys
 import parmed as pmd
 
 # 1. prepare enzyme/receptor and protonate it at a given pH using propka. pH may be changed if you're interested in the effects of pH on the system such as histidine protonation.
-print("Protonating enzyme at pH 5.0...")
-os.system("pdb2pqr --ff=AMBER --titration-state-method=propka --with-ph=5.0 <enzyme>.pdb --ffout=AMBER <enzyme_pH5>.pdb")
+print("Protonating enzyme at pH 7.0...")
+os.system("pdb2pqr --ff=AMBER --titration-state-method=propka --with-ph=7.0 <enzyme>.pdb --ffout=AMBER <enzyme_pH7>.pdb")
 
 # 2. pick enzyme and substrate, combine into one object, check and list all disulfide bonds, add more disulfide bonds if needed.
 print("Building OpenMM system...")
-enzyme_pdb = PDBFile('<enzyme_pH5>.pdb')
+enzyme_pdb = PDBFile('<enzyme_pH7>.pdb')
 ligand_pdb = PDBFile('<substrate_topbindingmode>.pdb')
 
 modeller = Modeller(enzyme_pdb.topology, enzyme_pdb.positions)
@@ -33,8 +33,8 @@ modeller.topology.createDisulfideBonds(modeller.positions)
 n_bonds_after = __builtins__.sum(1 for _ in modeller.topology.bonds())
 print(f"Disulfide bonds added: {n_bonds_after - n_bonds_before}")
 
-# 3. apply force fields specific to your enzyme/substrate. also, solvate using OPC water (a 4-point water model). verify the protonation states of histidine residues.
-forcefield = ForceField('amber19-all.xml', 'amber14/GLYCAM_06j-1.xml', 'amber19/opc.xml')
+# 3. apply force fields specific to your enzyme/substrate. also, solvate using OPC3 water (a 3-point water model, more recent and accurate than other 3-point models). verify the protonation states of histidine residues.
+forcefield = ForceField('amber19-all.xml', 'amber14/GLYCAM_06j-1.xml', 'amber19/opc3.xml')
 
 ligand_residue_names = {'ROH', '4YB', '0YB'}
 ligand_residues = [r for r in modeller.topology.residues() if r.name in ligand_residue_names]
@@ -51,8 +51,8 @@ for res in modeller.topology.residues():
         atom_names = [a.name for a in res.atoms()]
         print(res.name, res.id, atom_names)
 
-# note that model='tip4pew' because model in openMM does not take opc as an argument. however, this just tells openMM that you're using a four point water system, and the actual parameters for opc water are set in the forcefield above.
-modeller.addSolvent(forcefield, model='tip4pew', boxShape='octahedron', padding=1.1*nanometers, ionicStrength=0.15*unit.molar)
+# note that model='tip3p' because model in openMM does not take opc as an argument. however, this just tells openMM that you're using a three point water system, and the actual parameters for opc water are set in the forcefield above.
+modeller.addSolvent(forcefield, model='tip3p', boxShape='octahedron', padding=1.1*nanometers, positiveIon='Na+', negativeIon='Cl-', ionicStrength=0.15*unit.molar, neutralize=True)
 
 # 4. create topology, add temperature control then barostat, save solvated system. also, create a separate system export to eventually save as a .prmtop file. for some reason, hydrogen bond occupancy didn't work with the solvated_system.pdb file, although other analysis did. constraints and rigidwater have to be removed for that due to incompatibilities between openmm and parmed.
 system = forcefield.createSystem(
@@ -119,9 +119,9 @@ print(f"Restrained {len(restrained_atom_indices)} heavy atoms.")
 
 # 6. gradual heating was chosen for a similar reason as heavy atom restraints. moving the system from its crystallized structure to 300 K abruptly can cause unfolding or sudden unwanted shifts in structure, so this allows the system to settle more gently.
 
-print("Step 2: Gradual heating phase (0 K -> 300 K over 100 ps)...")
+print("Step 2: Gradual heating phase (0 K -> 300 K over 400 ps)...")
 heating_steps = 100
-steps_per_increment = 500  # 500 steps * 2 fs = 1 ps per temperature step
+steps_per_increment = 2000  # 2000 steps * 2 fs = 4 ps per temperature step, allows the system to slowly heat up
 for i in range(heating_steps):
     current_temp = (i / heating_steps) * 300 * unit.kelvin
     integrator.setTemperature(current_temp)
@@ -134,8 +134,9 @@ integrator.setTemperature(300*unit.kelvin)
 system.addForce(mm.MonteCarloBarostat(1.0*unit.bar, 300*unit.kelvin))
 simulation.context.reinitialize(preserveState=True)
 
+# release time of 1 ns, since it's 10 steps, and 100 ps per step
 print("Releasing positional restraints gradually...")
-release_steps = 5
+release_steps = 10
 initial_k = 100.0
 for i in range(release_steps):
     scale = 1.0 - (i / (release_steps - 1))  # 1.0 -> 0.0
