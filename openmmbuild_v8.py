@@ -70,7 +70,34 @@ system_for_export = forcefield.createSystem(
     rigidWater=False
 )
 
-# change the random seed if desired. CUDA ensures that the GPU will be used for computation. mixed precision is sufficient for most cases. higher precision is much more computationally expensive.
+from openmm.app import PDBFile
+PDBFile.writeFile(modeller.topology, modeller.positions, open('solvated_system.pdb', 'w'))
+structure = pmd.openmm.load_topology(modeller.topology, system_for_export, modeller.positions)
+structure.save('solvated_system.prmtop', format='amber')
+structure.save('solvated_system.inpcrd', format='rst7')
+print(".prmtop file created.")
+
+# 5. restrain heavy atoms by applying a penalty to their harmonic motion, because this allows for the water molecules to settle into the system and can help prevent sudden jumps in energy or unexpected changes in structure.
+print("Step 1: Applying positional restraints before equilibration...")
+restraint = mm.CustomExternalForce('k*periodicdistance(x, y, z, x0, y0, z0)^2')
+restraint.addGlobalParameter('k', 100.0 * unit.kilocalories_per_mole/unit.angstrom**2)
+restraint.addPerParticleParameter('x0')
+restraint.addPerParticleParameter('y0')
+restraint.addPerParticleParameter('z0')
+
+restrained_atom_indices = []
+for atom in modeller.topology.atoms():
+    if atom.residue.name in ('HOH', 'WAT', 'NA', 'CL', 'K'):
+        continue
+    if atom.element is not None and atom.element.symbol != 'H':
+        restraint.addParticle(atom.index, modeller.positions[atom.index])
+        restrained_atom_indices.append(atom.index)
+
+system.addForce(restraint)
+print(f"Restrained {len(restrained_atom_indices)} heavy atoms.")
+
+# 6. initializes the integrator, which sets initial temperature. change the random seed (set for reproducibility) if desired for doing replicates.
+# CUDA ensures that the GPU will be used for computation. mixed precision is sufficient for most cases. higher precision is much more computationally expensive.
 integrator = mm.LangevinMiddleIntegrator(0*unit.kelvin, 1.0/unit.picosecond, 0.002*unit.picoseconds)
 seed=13
 integrator.setRandomNumberSeed(seed)
@@ -80,46 +107,17 @@ properties = {'CudaPrecision': 'mixed'}
 simulation = app.Simulation(modeller.topology, system, integrator, platform, properties)
 simulation.context.setPositions(modeller.positions)
 
-from openmm.app import PDBFile
-PDBFile.writeFile(modeller.topology, modeller.positions, open('solvated_system.pdb', 'w'))
-structure = pmd.openmm.load_topology(modeller.topology, system_for_export, modeller.positions)
-structure.save('solvated_system.prmtop', format='amber')
-structure.save('solvated_system.inpcrd', format='rst7')
-print(".prmtop file created.")
-
-# 5. initialize simulation: perform energy minimization. report energy before and after minimization. restrain heavy atoms by applying a penalty to their harmonic motion, because this allows for the water molecules to settle into the system and can help prevent sudden jumps in energy or unexpected changes in structure. may not be that necessary but doing it just in case for a more defensible method.
-print("Step 1: Energy minimization and positional restraints...")
+# 7. initialize simulation: perform energy minimization. report energy before and after minimization. 
+print("Step 2: Energy minimization and positional restraints...")
 state_before = simulation.context.getState(getEnergy=True)
 print(f"Potential energy before minimization: {state_before.getPotentialEnergy()}")
 simulation.minimizeEnergy(maxIterations=10000)
 state_after = simulation.context.getState(getEnergy=True)
 print(f"Potential energy after minimization: {state_after.getPotentialEnergy()}")
 
-print("Applying positional restraints for heating/equilibration...")
-restraint = mm.CustomExternalForce('k*periodicdistance(x, y, z, x0, y0, z0)^2')
-restraint.addGlobalParameter('k', 100.0 * unit.kilocalories_per_mole/unit.angstrom**2)
-restraint.addPerParticleParameter('x0')
-restraint.addPerParticleParameter('y0')
-restraint.addPerParticleParameter('z0')
-
-minimized_positions = simulation.context.getState(getPositions=True).getPositions()
-
-restrained_atom_indices = []
-for atom in modeller.topology.atoms():
-    # Restrain protein and ligand heavy atoms; skip water/ions and all hydrogens
-    if atom.residue.name in ('HOH', 'WAT', 'NA', 'CL', 'K'):
-        continue
-    if atom.element is not None and atom.element.symbol != 'H':
-        restraint.addParticle(atom.index, minimized_positions[atom.index])
-        restrained_atom_indices.append(atom.index)
-
-system.addForce(restraint)
-simulation.context.reinitialize(preserveState=True)
-print(f"Restrained {len(restrained_atom_indices)} heavy atoms.")
-
-# 6. gradual heating was chosen for a similar reason as heavy atom restraints. moving the system from its crystallized structure to 300 K abruptly can cause unfolding or sudden unwanted shifts in structure, so this allows the system to settle more gently.
-
-print("Step 2: Gradual heating phase (0 K -> 300 K over 400 ps)...")
+# 8. gradual heating was chosen for a similar reason as heavy atom restraints. this simulation is now NVT.
+# moving the system from its crystallized structure to 300 K abruptly can cause unfolding or sudden unwanted shifts in structure, so this allows the system to settle more gently.
+print("Step 3: Gradual heating phase (0 K -> 300 K over 400 ps)...")
 heating_steps = 100
 steps_per_increment = 2000  # 2000 steps * 2 fs = 4 ps per temperature step, allows the system to slowly heat up
 for i in range(heating_steps):
@@ -130,12 +128,13 @@ for i in range(heating_steps):
         print(f"  -> Temperature reached: {current_temp.value_in_unit(unit.kelvin):.1f} K")
 integrator.setTemperature(300*unit.kelvin)
 
-# 7. add barostat (which sets the pressure of the system) and release restraints on heavy atoms gradually. do not add the barostat until the temperature is fully set after gradual heating because of pressure/temperature relationship. 
+# 9. add barostat (which sets the pressure of the system) and release restraints on heavy atoms gradually. 
+# do not add the barostat until the temperature is fully set after gradual heating because of pressure/temperature relationship. this simulation is now NPT.
 system.addForce(mm.MonteCarloBarostat(1.0*unit.bar, 300*unit.kelvin))
 simulation.context.reinitialize(preserveState=True)
 
 # release time of 1 ns, since it's 10 steps, and 100 ps per step
-print("Releasing positional restraints gradually...")
+print("Step 4: Releasing positional restraints gradually...")
 release_steps = 10
 initial_k = 100.0
 for i in range(release_steps):
@@ -146,7 +145,7 @@ for i in range(release_steps):
 
 print("System equilibrated at 300 K, restraints released. Starting 10 ns production run...")
 
-# 8. set up reporters. downstream analysis such as RMSD and RMSF. will be done on the trajectory.dcd and .prmtop files. run simulation for 10 ns (5,000,000 steps * 0.002 ps). note that this is only a test run, and 100 ns+ (or doing replicates of 50 ns+) are strongly recommended for publishable results.
+# 10. set up reporters. downstream analysis such as RMSD and RMSF. will be done on the trajectory.dcd and .prmtop files. run simulation for 10 ns (5,000,000 steps * 0.002 ps). note that this is only a test run, and 100 ns+ (and/or doing replicates of 100 ns+) are strongly recommended for publishable results.
 simulation.reporters.append(app.DCDReporter('trajectory.dcd', 10000)) 
 simulation.reporters.append(app.CheckpointReporter('checkpoint.chk', 10000))
 simulation.reporters.append(app.StateDataReporter(
