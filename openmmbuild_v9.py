@@ -69,9 +69,11 @@ system_for_export = forcefield.createSystem(
     constraints=None,
     rigidWater=False
 )
-
+# export the system as .pdb and as .cif. note that the .pdb format cannot accommodate more than 99,999 atoms so there is no reason to export it as .pdb if your system is large.
 from openmm.app import PDBFile
 PDBFile.writeFile(modeller.topology, modeller.positions, open('solvated_system.pdb', 'w'))
+from openmm.app import PDBxFile
+PDBxFile.writeFile(modeller.topology, modeller.positions, open('solvated_system.cif', 'w'))
 structure = pmd.openmm.load_topology(modeller.topology, system_for_export, modeller.positions)
 structure.save('solvated_system.prmtop', format='amber')
 structure.save('solvated_system.inpcrd', format='rst7')
