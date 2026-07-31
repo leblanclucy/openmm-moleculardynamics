@@ -1,0 +1,15 @@
+#change to match your number of frames in your trajectory and how many of those frames you want to analyze
+&general
+   startframe=1, endframe=500, interval=5,
+   verbose=1, keep_files=0,
+/
+#for MM/GBSA. igb=5 matches mbondi2 atomic radius. saltcon=0.150 should match the molarity of your NaCl in molar.
+&gb
+   igb=5, saltcon=0.150,
+/
+#per-residue decomposition using MM/GBSA. idecomp=3 looks at interactions between residues (pairwise). #choose residues to look at using print_res. put the numbers of residues that you know are interacting with one another based on distance.
+&decomp
+   idecomp=3,
+   dec_verbose=1,
+   print_res="453, 709"
+/
