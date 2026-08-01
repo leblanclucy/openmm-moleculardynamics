@@ -3,6 +3,7 @@ from MDAnalysis import transformations
 from MDAnalysis.analysis import rms, align
 from MDAnalysis.analysis.rdf import InterRDF
 from MDAnalysis.analysis.hydrogenbonds import HydrogenBondAnalysis
+from MDAnalysis.analysis import contacts
 import mdtraj as md
 import numpy as np
 import pandas as pd
@@ -63,7 +64,7 @@ time_series_dict = {
 # convert from a dictionary to a data frame for export.
 df_time_series = pd.DataFrame(time_series_dict)
 
-# save to a clean comma-separated text file.
+# save to csv.
 df_time_series.to_csv('trajectory_time_series_summary.csv', index=False)
 print("Saved time-series properties to trajectory_time_series_summary.csv")
 
@@ -88,7 +89,7 @@ residue_numbers = calphas.resids
 rmsf_output = np.column_stack((residue_numbers, rmsf_data))
 np.savetxt('protein_rmsf.dat', rmsf_output, 
            header='Residue_ID Fluctuation_A', 
-           fmt='%d %.4f')
+           fmt='%d %.4f', delimiter='\t')
 print("Successfully calculated RMSF.")
 
 # calculate Define Secondary Structure of Proteins (DSSP). the explanation of each code is given at https://biopython.org/docs/1.76/api/Bio.PDB.DSSP.html. note that 'C' is used as a placeholder for 'unable to predict'. need to refine as there have been updates to DSSP (see Hekkelman et al., 2025, doi 10.1002/pro.70208) and some issues with the default naming structure.
@@ -115,20 +116,79 @@ rdf_output = np.column_stack((bins, g_r))
 
 np.savetxt('interface_water_rdf.dat', rdf_output, 
            header='Distance_Angstroms g(r)', 
-           fmt='%.3f %.4f', delimiter='\t')
+           fmt=['%.3f', '%.4f'], delimiter='\t')
 
 print("Successfully predicted DSSP and radial distribution function.")
 
-# calculate hydrogen bond occupancy between subunits given a maximum distance of 3.5 A and a maximum angle of 120 degrees.
+# calculate native contacts between chains (which can be used to look at all forces, not just hydrogen bonding) using a cutoff of 4.0 A which is lower than what is recommended by the MDanalysis docs (i had too many residues at 100% with 4.5 A which was not helpful).
 chain_a_sel = 'protein and resid 1-473'
 chain_b_sel = 'protein and resid 474-946'
+
+u.trajectory[0]
+ref_a = u.select_atoms(chain_a_sel)
+ref_b = u.select_atoms(chain_b_sel)
+
+nc = contacts.Contacts(
+    u, select=(chain_a_sel, chain_b_sel), refgroup=(ref_a, ref_b), method='hard_cut', radius=4.0
+)
+nc.run(verbose=True, step=10)
+
+nc_df= pd.DataFrame({
+    'Frame': nc.results.timeseries[:,0].astype(int),
+    'FractionNativeContacts_Q': nc.results.timeseries[:,1]
+})
+nc_df.to_csv('native_contacts_timeseries.csv',index=False)
+print("Calculated fraction of native contacts between the protein and ligand.")
+
+# per residue analysis of native contacts, looks at what residues are involved at the interface, again the cutoff is 4.0 A.
+from MDAnalysis.lib.distances import distance_array
+
+ca_group = u.select_atoms(chain_a_sel + ' and not name H*')
+cb_group = u.select_atoms(chain_b_sel + ' and not name H*')
+
+u.trajectory[0]
+ref_dist = distance_array(ca_group.positions, cb_group.positions, box=u.dimensions)
+native_atom_pairs = np.argwhere(ref_dist <= 4.0)
+
+# collapse native atom-pairs to unique (chain A resid, chain B resid) pairs
+pair_to_atompairs = {}
+for i, j in native_atom_pairs:
+    key = (ca_group[i].resid, cb_group[j].resid)
+    pair_to_atompairs.setdefault(key, []).append((i, j))
+
+residue_pair_keys = list(pair_to_atompairs.keys())
+contact_counts = np.zeros(len(residue_pair_keys), dtype=int)
+n_analyzed = 0
+
+for ts in u.trajectory[::10]:  # must match the step used for nc.run() above
+    d = distance_array(ca_group.positions, cb_group.positions, box=u.dimensions)
+    for k, key in enumerate(residue_pair_keys):
+        if any(d[i, j] <= 4.0 for i, j in pair_to_atompairs[key]):
+            contact_counts[k] += 1
+    n_analyzed += 1
+
+resname_a = {res.resid: res.resname for res in ca_group.residues}
+resname_b = {res.resid: res.resname for res in cb_group.residues}
+
+contact_df = pd.DataFrame({
+    'ChainA_Resid': [k[0] for k in residue_pair_keys],
+    'ChainA_ResName': [resname_a[k[0]] for k in residue_pair_keys],
+    'ChainB_Resid': [k[1] for k in residue_pair_keys],
+    'ChainB_ResName': [resname_b[k[1]] for k in residue_pair_keys],
+    'Occupancy_Percent': 100 * contact_counts / n_analyzed
+})
+contact_df = contact_df.sort_values(by='Occupancy_Percent', ascending=False)
+contact_df.to_csv('native_contacts_by_residue.csv', index=False)
+print("Calculated per-residue native contacts.")
+
+# calculate hydrogen bond occupancy between subunits given a maximum distance of 3.5 A and a maximum angle of 120 degrees.
 hb_analysis = HydrogenBondAnalysis(
     universe=u, between=[chain_a_sel, chain_b_sel], donors_sel='protein and (name N* O*)', acceptors_sel='protein and (name N* O*)', hydrogens_sel='element H', d_a_cutoff=3.5, d_h_a_angle_cutoff=150.0
 )
-hb_analysis.run(verbose=True)
+hb_analysis.run(verbose=True, step=10)
 
 # export hydrogen bond results, sorting by highest occupancy
-n_frames = u.trajectory.n_frames
+n_frames = hb_analysis.n_frames
 bonds = hb_analysis.results.hbonds
 
 if len(bonds) > 0:
