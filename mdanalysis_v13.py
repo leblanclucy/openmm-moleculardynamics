@@ -5,10 +5,11 @@
 # solvent-accessible surface area (SASA)
 # secondary structure (DSSP)
 # substrate-water radial distribution function (RDF)
-# hydrogen bond occupancy between protein and substrate
+# hydrogen bond occupancy between protein and substrate (direct)
+# hydrogen bond occupancy via water bridges (first order only, less computationally expensive)
 
 # input is solvated_system.prmtop and trajectory_centered.dcd (made by unwrap.py)
-# output: trajectory_time_series.csv with RMSD, Rg, SASA, %SS; protein_rmsf.dat, catalytic_domain_rmsf.dat, secondary_structure_full.txt with DSSP, ligand_water_rdf.dat with RDF, and hydrogen_bond_occupancy.tsv
+# output: trajectory_time_series.csv with RMSD, Rg, SASA, %SS; protein_rmsf.dat, catalytic_domain_rmsf.dat, secondary_structure_full.txt with DSSP, ligand_water_rdf.dat with RDF, hydrogen_bond_occupancy.tsv, and water_bridge_occupancy.tsv
 
 import numpy as np
 import pandas as pd
@@ -16,6 +17,7 @@ import MDAnalysis as mda
 from MDAnalysis.analysis import rms, align
 from MDAnalysis.analysis.rdf import InterRDF
 from MDAnalysis.analysis.hydrogenbonds import HydrogenBondAnalysis
+from MDAnalysis.analysis.hydrogenbonds import WaterBridgeAnalysis
 import mdtraj as md
 
 # set key variables to be used for downstream analysis
@@ -23,7 +25,7 @@ import mdtraj as md
 TOPOLOGY = 'solvated_system.prmtop'
 TRAJECTORY = 'trajectory_centered.dcd'
 
-CATALYTIC_DOMAIN_RESID = "58-300"  # edit for each enzyme
+CATALYTIC_DOMAIN_RESID = "58-300"  # edit for each enzyme corresponding to catalytic domain from MSA
 
 WATER_RESNAMES = "HOH WAT"
 ION_RESNAMES = "NA CL"
@@ -31,6 +33,7 @@ LIGAND_RESNAMES = "ROH 4YB 0YB"
 
 HBOND_DISTANCE_CUTOFF = 3.5   # Angstroms, donor-acceptor
 HBOND_ANGLE_CUTOFF = 150.0    # degrees, D-H...A
+ORDER = 1                     # controls whether you look at first order water bridges or beyond
 
 # stride depends on what you're measuring. for example DSSP does not change quickly so a stride of 5 is acceptable, whereas hydrogen bonds are short-lived.
 
@@ -220,5 +223,49 @@ hb_df['Acceptor_atom'] = [f"{u.atoms[i].resname}{u.atoms[i].resid}-{u.atoms[i].n
 hb_df = hb_df.sort_values(by='Occupancy_Percent', ascending=False)
 hb_df.to_csv('hydrogen_bond_occupancy.tsv', sep='\t', index=False)
 print("Saved hydrogen_bond_occupancy.tsv")
+
+# calculate hydrogen bonds through water bridges that link the substrate and active site.
+# first add additional atom names, beyond just the default, as OpenMM calls water's oxygen atoms just "O" and the carbohydrate substrate's oxygens have special names like O1, O3 etc.
+
+GLYCAM06_DONORS = ('NT', 'OH', 'OW', 'N3', 'N', 'O',
+                    'O1', 'O3', 'O4', 'O6', 'N2')       # substrate's actual H bond donors, based on pdb file
+GLYCAM06_ACCEPTORS = ('NT', 'OH', 'OW', 'OY', 'OS', 'O', 'SM', 'N', 'O2',
+                       'O1', 'O3', 'O4', 'O5', 'O6', 'O2N')  # same but for H bond acceptors.
+
+wb = WaterBridgeAnalysis(
+    universe=u,
+    selection1=protein_sel,
+    selection2=ligand_sel,
+    water_selection=f'resname {WATER_RESNAMES}',
+    order=ORDER,
+    update_water_selection=True,
+    distance=HBOND_DISTANCE_CUTOFF,
+    angle=HBOND_ANGLE_CUTOFF,
+    donors=GLYCAM06_DONORS,
+    acceptors=GLYCAM06_ACCEPTORS,
+)
+wb.run(start=FRAME_START, stop=FRAME_STOP, step=STRIDE_HBOND)
+
+counts = wb.count_by_type()
+
+print(f"\nUnique water bridge types detected: {len(counts)}")
+
+if len(counts) == 0:
+    print("\nWARNING: zero water bridges detected. Double check atom names.")
+
+# export water bridge analysis results.
+
+else:
+    bridge_df = pd.DataFrame(counts, columns=[
+        'Sele1_Index', 'Sele2_Index',
+        'Sele1_Resname', 'Sele1_Resid', 'Sele1_Atom',
+        'Sele2_Resname', 'Sele2_Resid', 'Sele2_Atom',
+        'Occupancy_Fraction',
+    ])
+    bridge_df['Occupancy_Percent'] = bridge_df['Occupancy_Fraction'] * 100
+    bridge_df = bridge_df.sort_values('Occupancy_Percent', ascending=False)
+    bridge_df.to_csv('water_bridge_occupancy.tsv', sep='\t', index=False)
+    print("\nSaved water_bridge_occupancy.tsv")
+    print(bridge_df.head(5))
  
 print("\nMD analysis done.")
