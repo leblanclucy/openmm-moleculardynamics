@@ -182,44 +182,36 @@ np.savetxt('ligand_water_rdf.dat', rdf_output,
            header='Distance_Angstroms g(r)', fmt='%.3f %.4f')
 print("Saved ligand_water_rdf.dat")
 
-# calculate hydrogen bond occupancy.
+# calculate hydrogen bond occupancy between the protein and ligand.
 
 protein_sel = 'protein'
 ligand_sel = f'resname {LIGAND_RESNAMES}'
- 
-hb_protein_donor = HydrogenBondAnalysis(
-    universe=u, donors_sel=protein_sel, acceptors_sel=ligand_sel,
-    hydrogens_sel='element H',
-    d_a_cutoff=HBOND_DISTANCE_CUTOFF, d_h_a_angle_cutoff=HBOND_ANGLE_CUTOFF
-)
-hb_protein_donor.run(start=FRAME_START, stop=FRAME_STOP, step=STRIDE_HBOND)
- 
-hb_ligand_donor = HydrogenBondAnalysis(
-    universe=u, donors_sel=ligand_sel, acceptors_sel=protein_sel,
-    hydrogens_sel='element H',
-    d_a_cutoff=HBOND_DISTANCE_CUTOFF, d_h_a_angle_cutoff=HBOND_ANGLE_CUTOFF
-)
-hb_ligand_donor.run(start=FRAME_START, stop=FRAME_STOP, step=STRIDE_HBOND)
 
+hb = HydrogenBondAnalysis(
+    universe=u,
+    between=[protein_sel, ligand_sel],
+    d_a_cutoff=HBOND_DISTANCE_CUTOFF,
+    d_h_a_angle_cutoff=HBOND_ANGLE_CUTOFF,
+)
+protein_or_ligand_sel = f'({protein_sel}) or ({ligand_sel})'
+hb.hydrogens_sel = hb.guess_hydrogens(protein_or_ligand_sel)
+hb.acceptors_sel = hb.guess_acceptors(protein_or_ligand_sel)
+
+hb.run(start=FRAME_START, stop=FRAME_STOP, step=STRIDE_HBOND)
 n_frames_analyzed = len(range(FRAME_START, FRAME_STOP, STRIDE_HBOND))
- 
-bonds_a = hb_protein_donor.results.hbonds
-bonds_b = hb_ligand_donor.results.hbonds
-all_bonds = np.vstack((bonds_a, bonds_b))
-bond_keys = all_bonds[:, 1:4].astype(int)  # donor_idx, hydrogen_idx, acceptor_idx
-unique_bonds, counts = np.unique(bond_keys, axis=0, return_counts=True)
-bond_occupancy_percent = (counts / n_frames_analyzed) * 100
- 
-hb_df = pd.DataFrame({
-    'Donor_idx': unique_bonds[:, 0],
-    'Hydrogen_idx': unique_bonds[:, 1],
-    'Acceptor_idx': unique_bonds[:, 2],
-    'Occupancy_Percent': bond_occupancy_percent,
-})
-hb_df['Donor_atom'] = [f"{u.atoms[i].resname}{u.atoms[i].resid}-{u.atoms[i].name}"
-                        for i in unique_bonds[:, 0]]
-hb_df['Acceptor_atom'] = [f"{u.atoms[i].resname}{u.atoms[i].resid}-{u.atoms[i].name}"
-                           for i in unique_bonds[:, 2]]
+
+id_counts = hb.count_by_ids()
+
+hb_df = pd.DataFrame(id_counts, columns=['Donor_idx', 'Hydrogen_idx', 'Acceptor_idx', 'Count'])
+hb_df['Occupancy_Percent'] = hb_df['Count'].astype(float) / n_frames_analyzed * 100
+
+id_to_atom = {atom.id: atom for atom in u.atoms}
+hb_df['Donor_atom'] = [f"{id_to_atom[i].resname}{id_to_atom[i].resid}-{id_to_atom[i].name}"
+                        for i in hb_df['Donor_idx']]
+
+hb_df['Acceptor_atom'] = [f"{id_to_atom[i].resname}{id_to_atom[i].resid}-{id_to_atom[i].name}"
+                           for i in hb_df['Acceptor_idx']]
+                           
 hb_df = hb_df.sort_values(by='Occupancy_Percent', ascending=False)
 hb_df.to_csv('hydrogen_bond_occupancy.tsv', sep='\t', index=False)
 print("Saved hydrogen_bond_occupancy.tsv")
