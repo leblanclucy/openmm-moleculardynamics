@@ -1,5 +1,8 @@
 OVERALL WORKFLOW
-**protein.pdb and ligand.pdb -> openmmbuild.py -> unwrap.py -> mdanalysis.py AND/OR mm_g-pbsa-prep.py**
+**protein.pdb and ligand.pdb (or .sdf) -> openmmbuild.py -> unwrap.py -> mdanalysis.py AND/OR mm_g-pbsa-prep.py followed by MMPBSA.PY using the .in files (Amber)**
+
+IN PARALLEL, for DFT
+**r2s-optsmd-<yourligandhere>.in for geometry optimization -> x for single-point energy calculations**
 
 Starting with either a crystal structure or an AlphaFold2-predicted structure of the enzyme (or receptor) as well as the substrate (or ligand) oriented in its top binding mode as predicted by AutoDock Vina or other molecular docking software, this allows you to run molecular dynamics with highly customizable parameters (including protonation states, force fields, water models, temperature) through OpenMM. During the molecular dynamics run, a .prmtop file (which describes the initial state of the solvated system) and a trajectory.dcd file (which describes how the complex moves from frame to frame) are created. 
 
