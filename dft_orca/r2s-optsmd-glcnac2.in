@@ -1,7 +1,7 @@
 ! r2SCAN-3c Opt TightSCF SMD(water) DRACO
-%maxcore 16000
+%maxcore 6000
 %pal
-  nprocs 8
+  nprocs 10
 end
 * xyz 0 1
 H         -3.37400        9.39100       -1.35600
