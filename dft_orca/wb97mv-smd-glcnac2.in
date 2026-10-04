@@ -1,7 +1,7 @@
 ! wB97M-V def2-TZVPP def2/J RIJCOSX TightSCF SMD(Water) DRACO CHELPG
-%maxcore 2000
+%maxcore 6000
 %pal
-  nprocs 4
+  nprocs 10
 end
 %elprop
   Dipole     true
