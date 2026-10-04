@@ -1,3 +1,5 @@
+# given a folder of .pdbqt files from Autodock Vina, find the names and affinity of each compound, then sort by most negative
+
 import glob
 import pandas as pd
 
