@@ -1,6 +1,6 @@
 # set working directory and confirm
 setwd('path/to/data/')
-get(wd)
+getwd()
 
 # import dependencies, install if needed
 library(ggplot2)
