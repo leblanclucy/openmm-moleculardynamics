@@ -17,7 +17,7 @@ colnames(dfs) <- c("Time_ns", "enzyme1_seed13")
 longs <- dfs |> pivot_longer(-Time_ns, names_to=c("condition", "replicate"), names_sep="_", values_to="SASA")
 
 # use summarize to get mean and standard deviation
-summs <- longs |> group_by(condition, Time_ns) |> summarize(mean=mean(SASA), sd=sd(SASA), n=n(), .groups="drop") |> mutate(lower = pmax(mean-sd), upper = mean+sd)
+summs <- longs |> group_by(condition, Time_ns) |> summarize(mean=mean(SASA), sd=sd(SASA), n=n(), .groups="drop") |> mutate(lower = mean-sd, upper = mean+sd)
 
 # plot using ggplot, graphing the means +/- the standard deviations, color coding both by enzyme
 # error bars are shown as grey shading in the background
