@@ -29,4 +29,4 @@ ggplot(summd, aes(x = element, y = mean, fill = enzyme)) + geom_col(position = p
 + labs(x = 'Secondary Structure Element', y = 'Percent (%)', fill = 'Enzyme') + theme_classic() + coord_cartesian(ylim = c(0,40))
              
 # export, keep the same hxw for all graphs for each figure, use cairo_ps to save with transparency
-ggsave('dssp_v1.eps', height=6, width=10, dpi=300, device=cairo_ps)
+ggsave('dssp_v1.eps', height=6, width=13, dpi=300, device=cairo_ps)
