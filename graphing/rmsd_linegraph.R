@@ -23,6 +23,7 @@ summ1 <- long1 |> group_by(condition, Time_ns) |> summarize(mean=mean(RMSD), n=n
 # plot using ggplot, graphing the means, color coding by whole protein vs. catalytic domain
 # replicates are shown separately as slightly thinner lines with lower opacity and different line style
 # adjust ylim as needed, for RMSD it should start at 0 because that's basically the starting point
+# if you need to specify the y axis tick mark/breaks interval use scale_y_continuous(breaks = seq(from, to, by = interval)), eg scale_y_continuous(breaks = seq(0, 10, by = 2))
 ggplot()+geom_line(data=long1, aes(x = Time_ns, y = RMSD, color = condition, linetype = replicate), linewidth = 0.65, alpha = 0.45)
 +geom_line(data=summ1, aes(x = Time_ns, y = mean, color = condition), linewidth = 0.75)+scale_color_manual(values = c(whole='black', cat='maroon')) 
 + scale_linetype_manual(values = c(seed13='solid', seed14='dotted', seed15='longdash'))
