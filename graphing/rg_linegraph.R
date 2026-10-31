@@ -16,7 +16,7 @@ colnames(dfr) <- c('Time_ns', 'enzyme1_seed13')
 longr <- dfr |> pivot_longer(-Time_ns, names_to=c('condition', 'replicate'), names_sep='_', values_to='Rg')
 
 # use summarize to get mean and standard deviation
-summr <- longr |> group_by(condition, Time_ns) |> summarize(mean=mean(Rg), sd=sd(Rg), n=n(), .groups='drop') |> mutate(lower = pmax(mean-sd), upper = mean+sd)
+summr <- longr |> group_by(condition, Time_ns) |> summarize(mean=mean(Rg), sd=sd(Rg), n=n(), .groups='drop') |> mutate(lower = mean-sd, upper = mean+sd)
 
 # plot using ggplot, graphing the means +/- the standard deviations, color coding both by enzyme
 # may want to set a y min that's non zero depending on how tightly clustered your data points are around a certain y value over the whole trajectory
