@@ -24,7 +24,7 @@ summd <- longd |> group_by(enzyme, element) |> summarize(mean=mean(percent), sd=
 # individual data points AND error bars are both graphed which is the standard for showing reproducibility
 ggplot(summd, aes(x = element, y = mean, fill = enzyme)) + geom_col(position = position_dodge(width=0.9), color = 'black', linewidth = 0.5) 
 + geom_errorbar(aes(ymin=lower, ymax=upper), position = position_dodge(width=0.9), width = 0.5) 
-+ geom_point(data = longd, aes(x = element, y = percent, fill = enzyme), color = 'grey50', position = position_jitterdodge(jitter.width = 0.2, dodge.width = 0.9), size = 1.5, show.legend = FALSE) 
++ geom_point(data = longd, aes(x = element, y = percent, fill = enzyme), color = 'grey20', position = position_jitterdodge(jitter.width = 0.2, dodge.width = 0.9), size = 1.5, show.legend = FALSE) 
 + scale_fill_manual(values = c(dm='blue4', ns='green3', cf='orange1', da='mediumorchid1')) 
 + labs(x = 'Secondary Structure Element', y = 'Percent (%)', fill = 'Enzyme') + theme_classic() + coord_cartesian(ylim = c(0,40))
              
