@@ -1,3 +1,5 @@
+# make sure you've installed rdkit, i usually use conda for environment control (conda install -c conda-forge rdkit)
+
 from rdkit import Chem
 from rdkit.Chem import AllChem
 

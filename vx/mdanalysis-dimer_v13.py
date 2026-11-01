@@ -1,3 +1,5 @@
+# make sure you've installed the dependencies below before importing, i usually used conda for environment control
+
 import MDAnalysis as mda
 from MDAnalysis import transformations
 from MDAnalysis.analysis import rms, align
