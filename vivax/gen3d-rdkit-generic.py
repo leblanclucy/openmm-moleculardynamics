@@ -15,4 +15,4 @@ print("embed status:", status)
 
 #optimize geometry with 5000 iterations
 AllChem.MMFFOptimizeMolecule(molec, maxIters=5000)
-Chem.MolToMolFile(molec, "6pg_pH74.sdf")
+Chem.MolToMolFile(molec, "[molecule_name].sdf")
