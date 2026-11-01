@@ -19,11 +19,13 @@ Further analysis is also possible in RStudio, and I also make most of my graphs 
 1) **Dynamic cross correlation matrix (DCCM)** - basically this looks at how each residue's movement over the course of the trajectory correlates with every other residue's movement. It shows you what regions of the protein move together vs. not at all (zero correlation) or in opposite directions which can be helpful looking at conformational changes or allosteric regulation.
 
 **For calculating MM/PBSA**
-Molecular mechanics/Poisson Boltzmann Surface Area (MM/PBSA) and molecular mechanics/Generalized Born Surface Area (MM/GBSA) are ways of measuring the ΔG of binding of the substrate to the enzyme, calculated via ΔGbinding = ΔGcomplex - ΔGenzyme - ΔGsubstrate. This is only an estimate and it's more interpreted as a trend across samples or conditions rather than as absolute values. You may read more about these methods at the following references: Genheden & Ryde in 2015 (https://doi.org/10.1517/17460441.2015.1032936), Yau et al. in 2024 (https://doi.org/10.1007/s00894-024-06189-4), or Tuccinardi in 2021 (https://doi.org/10.1080/17460441.2021.1942836).
+Molecular mechanics/Poisson Boltzmann Surface Area (MM/PBSA) and molecular mechanics/Generalized Born Surface Area (MM/GBSA) are ways of measuring the ΔG of binding (technically ΔH unless you explicitly calculate entropy which is way more computationally expensive and not as accurate) of the substrate to the enzyme, calculated via ΔGbinding = ΔGcomplex - ΔGenzyme - ΔGsubstrate. 
 
-To calculate it, the easiest way is to use mmpbsa.in which is the configuration file for using MMPBSA.py, a script included in Amber. This occurs after molecular dynamics. You must first run mm_g-pbsa-prep.py. This takes a .prmtop file as input (generated during the molecular dynamics run using ParmED in addition to the solvated_system.pdb file). It isolates the enzyme alone, substrate alone, and complex, all without water or ions. It also removes water from the trajectory_centered.dcd file.
+This is only an estimate and it's more interpreted as a trend across samples or conditions rather than as absolute values. You may read more about these methods at the following references: Genheden & Ryde in 2015 (https://doi.org/10.1517/17460441.2015.1032936), Yau et al. in 2024 (https://doi.org/10.1007/s00894-024-06189-4), or Tuccinardi in 2021 (https://doi.org/10.1080/17460441.2021.1942836).
 
-Once that is done, customize your mmpbsa.in file to either calculate MM/GBSA (quicker but less rigorous), MM/PBSA (more intensive), or both (recommended to try both at first for your system). You can also do per-residue decomposition to determine which residues are contributing most to the ΔG. Then run:
+To calculate binding energy, the easiest way is to use mmpbsa.in which is the configuration file for using MMPBSA.py, a script included in Amber. This occurs after molecular dynamics. You must first run mm_g-pbsa-prep.py. This takes a .prmtop file as input (generated during the molecular dynamics run using ParmED in addition to the solvated_system.pdb file). It isolates the enzyme alone, substrate alone, and complex, all without water or ions. It also removes water from the trajectory_centered.dcd file.
+
+Once that is done, customize your mmpbsa.in file to either calculate MM/GBSA (quicker but less rigorous), MM/PBSA (more intensive), or both (recommended to try both at first for your system). You can also do per-residue decomposition to determine which residues are contributing most to binding energy. Then run:
 
 MMPBSA.py -O -i mmpbsa.in -cp complex.prmtop -rp enzyme.prmtop -lp substrate.prmtop -y trajectory_no-solvent.nc > mmpbsa.log 2>&1 &
 
@@ -35,7 +37,7 @@ Future additions:
 1) Need to add distance to scissile bond or other more targeted distances worth tracking.
 2) Add per residue decomposition for MM-PBSA and MM-GBSA (prioritize using native contacts through cpptraj).
 3) Alchemical perturbation methods as well like free energy perturbation (FEP).
-4) Density functional theory for ligand characterization such as frontier orbital analysis.
-5) Grid inhomogeneous solvation theory (GIST) to look at entropically frustrated waters with or without substrate.
+4) Grid inhomogeneous solvation theory (GIST) to look at entropically frustrated waters with or without substrate.
+5) Code for every single graph I ever make in R.
 
 Note that my choice of downstream analysis was largely inspired by Karaoli et al., 2026 (https://doi.org/10.1039/d6ra00343e) which did molecular dynamics on thermostable PETases that degrade plastics.
