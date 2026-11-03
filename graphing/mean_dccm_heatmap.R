@@ -26,6 +26,10 @@ cij_list <- lapply(dirs, function(d) {
 cij_mean <- Reduce(`+`, cij_list) / length(cij_list)
 
 # get residue numbers and label matrix
+# reload pdb, ca.inds, and res variables because they are lost after the loop is done
+setwd('path')
+pdb <- read.pdb('solvated_system.pdb')
+ca.inds <- atom.select(pdb, elety = "CA")
 res <- pdb$atom$resno[ca.inds$atom]
 dimnames(cij_mean) <- list(res, res)
 
