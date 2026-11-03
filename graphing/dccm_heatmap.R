@@ -36,9 +36,9 @@ cij_long <- as.data.frame(cij) |> rownames_to_column('res_i') |> pivot_longer(-r
 # plot the data, coloring the correlations such that red is +1, blue is -1, and pale yellow is 0
 # set manual axis limits and also manual breaks every 50 residues
 # coord_fixed makes it square shaped even if you stretch out the window
-ggplot(cij_long, aes(x=res_i, y=res_j, fill = correlation)) + geom_tile() + scale_fill_gradientn(colours = rev(RColorBrewer::brewer.pal(11, "RdYlBu")), limits = c(-1, 1)) 
+p <- ggplot(cij_long, aes(x=res_i, y=res_j, fill = correlation)) + geom_tile() + scale_fill_gradientn(colours = rev(RColorBrewer::brewer.pal(11, "RdYlBu")), limits = c(-1, 1)) 
 + coord_fixed(xlim=c(0, 300), ylim=c(0,300), expand = FALSE) + labs (x = "Residue ID", y = "Residue ID") + theme_classic() + scale_x_continuous(breaks = scales::breaks_width(50)) 
 + scale_y_continuous(breaks = scales::breaks_width(50))
 
 # save the plot
-ggsave('dccm_v1.eps', height=10, width=12, dpi=300, device=cairo_ps)
+ggsave('dccm_v1.eps', p, height=10, width=12, dpi=300, device=cairo_ps)
