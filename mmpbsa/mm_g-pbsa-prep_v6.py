@@ -11,7 +11,7 @@ print("Changing intrinsic radii to mbondi2...")
 mbondi2(complex_top)
 
 # define target selection strings so that you can remove the solvent and ligand from the system, isolating just the enzyme.
-water_ions = ':HOH,WAT,SOL,NA,CL,K'
+water_ions = ':HOH,WAT,NA,CL'
 ligand_res = ':ROH,4YB,0YB'
 
 # 2. extract the enzyme ONLY, excluding the substrate, water, or ions.
@@ -21,9 +21,9 @@ enzyme_top.box = None  # Clear periodic boundary box info
 enzyme_top.save('enzyme.prmtop', overwrite=True)
 print("Enzyme extracted from topology.")
 
-# 3. extract the substrate ONLY. change "1-294" to reflect the number of amino acids in the enzyme.
+# 3. extract the substrate ONLY.
 substrate_top = complex_top[:]
-substrate_top.strip(f':1-294,{water_ions}')  # removes the enzyme and solvent
+substrate_top.strip(f'!({ligand_res})')  # removes the enzyme and solvent
 substrate_top.box = None  # clear periodic boundary box info to prevent a crash later on
 substrate_top.save('substrate.prmtop', overwrite=True)
 print("Substrate extracted from topology.")
