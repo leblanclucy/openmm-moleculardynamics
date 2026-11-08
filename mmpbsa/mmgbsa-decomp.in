@@ -7,8 +7,11 @@
 &gb
    igb=5, saltcon=0.150,
 /
+#does decomposition on ALL residues with a high level of verbosity
+#idecomp=2 combines 1-4 van der waals with total van der waals and 1-4 electrostatic added to total electrostatic
+#as opposed to adding the 1-4 terms to the internal potential terms
+#it seems to be the default and more common from what i've seen
 &decomp
    idecomp=2,
    dec_verbose=1,
-   print_res="residue numbers here",
 /
