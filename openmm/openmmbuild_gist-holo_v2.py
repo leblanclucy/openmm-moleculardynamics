@@ -6,6 +6,10 @@ import mdtraj as md
 import openmm as mm
 import openmm.app as app
 import openmm.unit as unit
+# this is for preventing an error that can happen when starting a new trajectory from an existing frame
+from openmm.app import AmberPrmtopFile
+from openmm.app.internal.unitcell import reducePeriodicBoxVectors
+
 
 # set random seed and temperature
 seed = 13
@@ -27,6 +31,9 @@ print(len(heavy), sorted({frame.topology.atom(i).residue.name for i in heavy}))
 
 # 2. build the system using the prmtop file as a starting point
 prmtop = app.AmberPrmtopFile('solvated_system.prmtop')
+
+# reduce the vectors of the box to prevent an error later
+box_vectors = reducePeriodicBoxVectors(prmtop.topology.getPeriodicBoxVectors())
 system = prmtop.createSystem(nonbondedMethod=app.PME,
                              nonbondedCutoff=1.0 * unit.nanometer,
                              constraints=app.HBonds)
@@ -59,7 +66,8 @@ properties = {'HipPrecision': 'mixed'}
 sim = app.Simulation(prmtop.topology, system, integrator, platform, properties)
 print(sim.context.getPlatform().getName(), sim.context.getPlatform().getPropertyValue(sim.context, 'HipPrecision'))
 
-sim.context.setPeriodicBoxVectors(*(v * unit.nanometer for v in box))   # box before positions
+# uses reduced box vectors to prevent crash
+sim.context.setPeriodicBoxVectors(*box_vectors)
 sim.context.setPositions(pos * unit.nanometer)
 sim.context.setVelocitiesToTemperature(T, seed)
 
@@ -82,7 +90,8 @@ sim.reporters.clear()
 sim.reporters.append(app.DCDReporter('gist_seed13.dcd', 1000))
 sim.reporters.append(app.CheckpointReporter('gist_seed13.chk', 500_000))
 sim.reporters.append(app.StateDataReporter('gist_seed13.log', 5000, step=True, time=True,
-                     potentialEnergy=True, temperature=True, volume=True, density=True))
+                     potentialEnergy=True, temperature=True, volume=True, density=True, progress=True, 
+                     totalSteps=50000000, speed=True))
 # run for 100 ns
 sim.step(50_000_000)                      
 sim.saveState('gist_final.xml')
