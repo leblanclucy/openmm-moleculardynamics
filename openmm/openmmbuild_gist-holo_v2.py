@@ -12,19 +12,21 @@ seed = 13
 T = 300 * unit.kelvin
 
 # 1. load last frame of an equilibrated run using the .dcd file
-with md.open('prod.dcd') as f:
+with md.open('trajectory_centered.dcd') as f:
     n_frames = len(f)
-frame = md.load_frame('prod.dcd', n_frames - 1, top='system.prmtop')   # 0-indexed
+frame = md.load_frame('trajectory_centered.dcd', n_frames - 1, top='solvated_system.prmtop')   # 0-indexed
 
 pos = frame.xyz[0]                        # nm, shape (N, 3)
 box = frame.unitcell_vectors[0]           # nm, shape (3, 3)
 
 # restrain heavy atoms for apo or holo
-heavy = frame.topology.select('protein and not element H')
+heavy = frame.topology.select('(protein or resname 4YB or resname 0YB or resname ROH) and not element H')
+print(len(heavy), sorted({frame.topology.atom(i).residue.name for i in heavy}))
+# apo: ('protein and not element H')
 # holo: '(protein or resname 4YB or resname 0YB or resname ROH) and not element H'
 
 # 2. build the system using the prmtop file as a starting point
-prmtop = app.AmberPrmtopFile('system.prmtop')
+prmtop = app.AmberPrmtopFile('solvated_system.prmtop')
 system = prmtop.createSystem(nonbondedMethod=app.PME,
                              nonbondedCutoff=1.0 * unit.nanometer,
                              constraints=app.HBonds)
@@ -42,7 +44,7 @@ for i in heavy:
 restraint.setForceGroup(1)
 system.addForce(restraint)
 
-# NPT: add the barostat
+# add the barostat
 barostat = mm.MonteCarloBarostat(1.0 * unit.bar, T)
 barostat.setRandomNumberSeed(seed)
 system.addForce(barostat)
@@ -50,24 +52,37 @@ system.addForce(barostat)
 # add the thermostat
 integrator = mm.LangevinMiddleIntegrator(T, 1 / unit.picosecond, 0.002 * unit.picoseconds)
 integrator.setRandomNumberSeed(seed)
-sim = app.Simulation(prmtop.topology, system, integrator)
+
+# initalize GPU platform
+platform = mm.Platform.getPlatformByName('HIP')
+properties = {'HipPrecision': 'mixed'}
+sim = app.Simulation(prmtop.topology, system, integrator, platform, properties)
+print(sim.context.getPlatform().getName(), sim.context.getPlatform().getPropertyValue(sim.context, 'HipPrecision'))
 
 sim.context.setPeriodicBoxVectors(*(v * unit.nanometer for v in box))   # box before positions
 sim.context.setPositions(pos * unit.nanometer)
 sim.context.setVelocitiesToTemperature(T, seed)
 
 # 3. allow equilibration for 5 ns, don't save any frames
-sim.reporters.append(app.StateDataReporter('gist_equil.log', 5000, step=True, time=True,
+sim.reporters.append(app.StateDataReporter('gist_equil13.log', 5000, step=True, time=True,
                      potentialEnergy=True, temperature=True, volume=True, density=True))
 sim.step(2_500_000)                       # 5 ns at 2 fs per step
 
 r = sim.context.getState(getEnergy=True, groups={1}).getPotentialEnergy()
 print('restraint energy after equilibration:', r)
 
+# disable barostat, initialize NVT simulation
+# in a previous paper i read they used OpenMM NVT for GIST (Wallerstein et al., 2021)
+barostat.setFrequency(0)
+sim.context.reinitialize(preserveState=True)
+
 # 4. production MD run for GIST
 sim.reporters.clear()
-sim.reporters.append(app.DCDReporter('gist_prod.dcd', 500))   # 1 ps; store every frame
-sim.reporters.append(app.StateDataReporter('gist_prod.log', 5000, step=True,
+# save every 1000 steps or 2 ps (1000 steps at 2 fs/step)
+sim.reporters.append(app.DCDReporter('gist_seed13.dcd', 1000))
+sim.reporters.append(app.CheckpointReporter('gist_seed13.chk', 500_000))
+sim.reporters.append(app.StateDataReporter('gist_seed13.log', 5000, step=True, time=True,
                      potentialEnergy=True, temperature=True, volume=True, density=True))
-sim.step(50_000_000)                      # 100 ns
+# run for 100 ns
+sim.step(50_000_000)                      
 sim.saveState('gist_final.xml')
