@@ -5,6 +5,7 @@ getwd()
 # import dependencies, install if needed
 library(ggplot2)
 library(tidyverse)
+library(ggpmisc)
 
 # import csv containing data, where the first column is x, and the second is y
 dfx <- read.csv('mmgbpsa_corr.csv')
@@ -19,7 +20,7 @@ p <- ggplot(dfx, aes(x=GBSA, y=PBSA)) + geom_smooth(method=lm, color='slateblue4
 + scale_x_continuous(breaks = scales::breaks_width(15)) + scale_y_continuous(breaks = scales::breaks_width(15))
 
 """
-for polynomial regression
+for polynomial regression. add scale breaks as well if desired
 ggplot(dfx, aes(x=GBSA, y=PBSA)) + geom_smooth(method=lm, formula=formula, color='slateblue4', se=TRUE, alpha=0.5) + geom_point(size = 3)
 + theme_classic() + coord_cartesian(xlim = c(-90,-20), ylim = c(-90,-20)) + stat_poly_eq(method=lm, formula=formula, geom='text', use_label('eq', 'r2'), label.x=-60, label.y=-40)
 """
