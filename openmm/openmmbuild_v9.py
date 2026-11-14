@@ -122,12 +122,14 @@ print(f"Potential energy after minimization: {state_after.getPotentialEnergy()}"
 print("Step 3: Gradual heating phase (0 K -> 300 K over 400 ps)...")
 heating_steps = 100
 steps_per_increment = 2000  # 2000 steps * 2 fs = 4 ps per temperature step, allows the system to slowly heat up
+# note, this ends at 297 K and then bumps up to 300 K, if you want it to ramp to 300 K and then linger for one more step, use for "i in range(heating_steps + 1):" and "if i % 10 == 0 or i == heating_steps:"
 for i in range(heating_steps):
     current_temp = (i / heating_steps) * 300 * unit.kelvin
     integrator.setTemperature(current_temp)
     simulation.step(steps_per_increment)
     if i % 10 == 0:
         print(f"  -> Temperature reached: {current_temp.value_in_unit(unit.kelvin):.1f} K")
+# can also delete this next line if you want it to gradually ramp to 300 instead of 297
 integrator.setTemperature(300*unit.kelvin)
 
 # 9. add barostat (which sets the pressure of the system) and release restraints on heavy atoms gradually. 
