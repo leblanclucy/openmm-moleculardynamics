@@ -24,10 +24,17 @@ pos = frame.xyz[0]                        # nm, shape (N, 3)
 box = frame.unitcell_vectors[0]           # nm, shape (3, 3)
 
 # restrain heavy atoms for apo or holo
-heavy = frame.topology.select('(protein or resname 4YB or resname 0YB or resname ROH) and not element H')
+# fixed this to create a dictionary of all resnames first rather than directly putting them into mdtraj
+# mdtraj doesn't seem to automatically recognize resnames beginning with a number
+solvent = {'HOH', 'NA', 'CL'}
+resnames = {'4YB', '0YB', 'ROH'}
+
+# for holo, ensure that the ligand is actually restrained
+heavy = np.array([a.index for a in frame.topology.atoms
+                  if a.residue.name not in solvent and a.element.symbol != 'H'])
 print(len(heavy), sorted({frame.topology.atom(i).residue.name for i in heavy}))
-# apo: ('protein and not element H')
-# holo: '(protein or resname 4YB or resname 0YB or resname ROH) and not element H'
+restrained = {frame.topology.atom(i).residue.name for i in heavy}
+assert {'4YB', 'OYB', 'ROH'} <= restrained
 
 # 2. build the system using the prmtop file as a starting point
 prmtop = app.AmberPrmtopFile('solvated_system.prmtop')
@@ -95,3 +102,4 @@ sim.reporters.append(app.StateDataReporter('gist_seed13.log', 5000, step=True, t
 # run for 100 ns
 sim.step(50_000_000)                      
 sim.saveState('gist_final.xml')
+print("Simulation complete.")
