@@ -34,7 +34,7 @@ heavy = np.array([a.index for a in frame.topology.atoms
                   if a.residue.name not in solvent and a.element.symbol != 'H'])
 print(len(heavy), sorted({frame.topology.atom(i).residue.name for i in heavy}))
 restrained = {frame.topology.atom(i).residue.name for i in heavy}
-assert {'4YB', 'OYB', 'ROH'} <= restrained
+assert {'4YB', '0YB', 'ROH'} <= restrained
 
 # 2. build the system using the prmtop file as a starting point
 prmtop = app.AmberPrmtopFile('solvated_system.prmtop')
