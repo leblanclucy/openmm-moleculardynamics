@@ -1,0 +1,16 @@
+#change to your prmtop and trajectory files
+parm solvated_system.prmtop
+trajin gist_seed13.dcd 1 5000
+
+#remove ions
+strip @Na
+strip @Cl
+
+#use the get_coords.py script to get the grid center, grid dimensions, etc. grid spacing is 0.5 A by default
+#make sure your reference density of bulk water matches your water model
+#set temperature as well according to your md run
+#i excluded doeij because i don't need water-water interactions
+gist doorder refdens 0.0334 temp 300 gridcntr 40.37 55.00 36.76 griddim 59 44 64 gridspacn 0.50 out gist.out info gist.info
+
+#execute gist by doing cpptraj gist.in in the terminal
+go
