@@ -98,7 +98,7 @@ sim.reporters.append(app.DCDReporter('gist_seed13.dcd', 1000))
 sim.reporters.append(app.CheckpointReporter('gist_seed13.chk', 500_000))
 sim.reporters.append(app.StateDataReporter('gist_seed13.log', 5000, step=True, time=True,
                      potentialEnergy=True, temperature=True, volume=True, density=True, progress=True, 
-                     totalSteps=50000000, speed=True))
+                     totalSteps=50000000, speed=True, remainingTime=True))
 # run for 100 ns
 sim.step(50_000_000)                      
 sim.saveState('gist_final.xml')
