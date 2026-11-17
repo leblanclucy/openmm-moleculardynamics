@@ -24,7 +24,7 @@ pos = frame.xyz[0]                        # nm, shape (N, 3)
 box = frame.unitcell_vectors[0]           # nm, shape (3, 3)
 
 # restrain heavy atoms for apo or holo
-# fixed this to create a dictionary of all resnames first rather than directly putting them into mdtraj
+# fixed this to create a set of all resnames first rather than directly putting them into mdtraj
 # mdtraj doesn't seem to automatically recognize resnames beginning with a number
 solvent = {'HOH', 'NA', 'CL'}
 resnames = {'4YB', '0YB', 'ROH'}
