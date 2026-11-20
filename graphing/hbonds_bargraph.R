@@ -6,7 +6,7 @@ getwd()
 dfh <- read.csv('hbonds.csv')
 
 # set order ahead of time
-enzyme_order <- c('DmChi1', 'NsChi1', 'CfChi1', 'DaChi1')
+enzyme_order <- c('Dm', 'Ns', 'Cf', 'Da')
 
 # reshape using pivot_longer, mapping each value to its enzyme and residue
 longh <- dfh |> pivot_longer(-replicate, names_to = c('enzyme', 'residue'), names_sep='_', values_to = 'occupancy') |> drop_na(occupancy) |> mutate(enzyme = factor(enzyme, levels=enzyme_order))
