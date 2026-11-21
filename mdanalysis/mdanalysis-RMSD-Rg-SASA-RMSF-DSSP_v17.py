@@ -19,9 +19,9 @@ import mdtraj as md
 TOPOLOGY = 'solvated_system.prmtop'
 TRAJECTORY = 'trajectory_centered.dcd'
 
-CATALYTIC_DOMAIN_RESID = "57-300"  # edit for each enzyme corresponding to catalytic domain from MSA
+CATALYTIC_DOMAIN_RESID = "55-299"  # edit for each enzyme corresponding to catalytic domain from MSA
 
-#Dm: 52-294, Ns: 71-313, Cf: 57-300, Da: 59-301. based on homology/MSA from Yoneda et al. 2025. starting at D(V/I)SS
+#Dm: 52-294, Ns: 71-313, Cf: 57-300, Da: 59-301. based on homology/MSA from Yoneda et al. 2025. starting at D(V/I)SS. for Os: 55-299. again starting at D even though it's followed immediately by G. truncating final 9 AAs since that's the vacuolar signal sequence.
 
 # determine what frames will be analyzed. default all except for DSSP and RMSF.
 
@@ -36,6 +36,9 @@ DSSP_STRIDE = 5
 
 u = mda.Universe(TOPOLOGY, TRAJECTORY)
 total_frames = u.trajectory.n_frames
+
+# set your save interval in ps, usually it's 10 ps per frame but i use 20 for equilibrium MD and 2 for GIST with restraints
+SAVE_INTERVAL_PS = 20.0
  
 protein = u.select_atoms('protein')
 protein_ca = u.select_atoms('protein and name CA')
@@ -69,7 +72,7 @@ frame_times = []
 for ts in u.trajectory:
     rg_whole.append(protein.radius_of_gyration())
     rg_domain.append(catalytic.radius_of_gyration())
-    frame_times.append(ts.time)
+    frame_times.append(ts.frame * SAVE_INTERVAL_PS)
  
 assert len(rg_whole) == len(R_whole.results.rmsd), \
     "Rg frame count doesn't match RMSD frame count"
