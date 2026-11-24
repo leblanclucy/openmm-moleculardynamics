@@ -27,4 +27,4 @@ summc <- longc |> group_by(planttype, binding_energy) |> summarize(mean=mean(aff
 ggplot(summc, aes(x = binding_energy, y = mean, fill = planttype)) + geom_col(position = position_dodge(width=0.9), color = 'black', linewidth = 0.5) + geom_errorbar(aes(ymin=lower, ymax=upper), position = position_dodge(width=0.9), width = 0.5) + geom_point(data = longc, aes(x = binding_energy, y = affinity), color = 'grey20', position = position_jitterdodge(jitter.width = 0.35, dodge.width = 0.9), size = 3, show.legend = FALSE) + scale_fill_manual(values = c(carniv='grey50', noncarniv='grey95')) + labs(x = 'Binding Affinity Method', y = 'Affinity (kcal mol-1)', fill = 'Plant Type') + theme_classic() + coord_cartesian(ylim = c(-100,0))
              
 # export, keep the same hxw for all graphs for each figure, use cairo_ps to save with transparency
-ggsave('mmgpbsa_carn_bar_v1.eps', height=10, width=12, dpi=300, device=cairo_ps)
+ggsave('mmgpbsa_carn_bar_v1.eps', height=10, width=10, dpi=300, device=cairo_ps)
