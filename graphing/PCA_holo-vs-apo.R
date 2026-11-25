@@ -59,7 +59,21 @@ var_exp_apovsholo <- round(100 * pc_apovsholo$L / sum(pc_apovsholo$L), 1)
 plot(pc_apovsholo)
 
 # plot using ggplot2, coloring by apo vs. holo
-ggplot(scores_apovsholo, aes(x = PC1, y = PC2, color = state)) + stat_density_2d(alpha = 0.8, linewidth = 0.5) + geom_point(alpha = 0.9, size = 1.2) + geom_hline(yintercept = 0, linetype = 'dashed', color = 'grey70', linewidth = 0.4) + geom_vline(xintercept = 0, linetype = 'dashed', color = 'grey70', linewidth = 0.4) + scale_color_manual(values = c('Apo'='grey20', 'Holo'='firebrick')) + labs(x = paste0('PC1 (', var_exp_apovsholo[1], '% variance)'), y = paste0('PC2 (', var_exp_apovsholo[2], '% variance)'), color = 'Condition') + theme_classic()
+ggplot(scores_apovsholo, aes(x = PC1, y = PC2, color = state)) + stat_density_2d(alpha = 0.8, linewidth = 0.5) + geom_point(alpha = 0.9, size = 1.2) + geom_hline(yintercept = 0, linetype = 'dashed', color = 'grey70', linewidth = 0.4) + geom_vline(xintercept = 0, linetype = 'dashed', color = 'grey70', linewidth = 0.4) + labs(x = paste0('PC1 (', var_exp_apovsholo[1], '% variance)'), y = paste0('PC2 (', var_exp_apovsholo[2], '% variance)'), color = 'Condition') + theme_classic()
 
 # export before you forget
 ggsave('pca_cf_v1.eps', height=6, width=7, dpi=300, device=cairo_ps)
+
+# optional: check PCA by replicate to see if there are outliers
+# first perform pca on the holo replicates only from the holo_data matrix
+pcholo <- pca.xyz(holo_data$xyz)
+
+scoresholo <- data.frame(PC1 = pcholo$z[, 1], PC2 = pcholo$z[, 2], replicate = factor(holo_data$meta$replicate))
+
+var_expholo <- round(100 * pcholo$L / sum(pcholo$L), 1)
+
+# plot and color by replicate, may be interesting to compare against MM/PBSA data
+ggplot(scoresholo, aes(x = PC1, y = PC2, color = replicate)) + stat_density_2d(alpha = 0.45, linewidth = 0.5) + geom_point(alpha = 0.25, size = 1.2) + scale_color_manual(values = c('1'='black', '2'='firebrick2', '3'='royalblue1', '4'='gray40')) + geom_hline(yintercept = 0, linetype = "dashed", color = "grey70", linewidth = 0.4) + geom_vline(xintercept = 0, linetype = "dashed", color = "grey70", linewidth = 0.4) + labs(x = paste0("PC1 (", var_expholo[1], "% variance)"), y = paste0("PC2 (", var_expholo[2], "% variance)"), color = "Replicate") + theme_classic()
+
+# export per-replicate PCA
+ggsave('pca_da_holo_v1.eps', height=6, width=7, dpi=300, device=cairo_ps)
