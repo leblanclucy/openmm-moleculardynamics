@@ -41,7 +41,7 @@ load_group <- function(dir_vec, state_label, n_last = 2500) {
 apo_data <- load_group(dirs_apo, 'Apo',  n_last = 2500)
 holo_data  <- load_group(dirs_holo, 'Holo', n_last = 2500)
 
-# 
+# pools all replicates for combined PCA so that holo and apo can be directly compared
 xyz_combined <- rbind(apo_data$xyz, holo_data$xyz)
 
 # add metadata which is whether a replicate is holo or apo
