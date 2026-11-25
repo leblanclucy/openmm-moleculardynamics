@@ -10,17 +10,28 @@ kB <- 0.001987204
 kBT <- kB * T_kelvin
 
 # define shared grid boundary applied to both apo and holo
-pad_x <- diff(range(scores_apovsholo$PC1)) * 0.1
-pad_y <- diff(range(scores_apovsholo$PC2)) * 0.1
+# this makes the maps more easily comparable
+pad_x <- diff(range(scores_apovsholo$PC1)) * 0.15
+pad_y <- diff(range(scores_apovsholo$PC2)) * 0.15
 shared_lims <- c(
   min(scores_apovsholo$PC1) - pad_x, max(scores_apovsholo$PC1) + pad_x,
   min(scores_apovsholo$PC2) - pad_y, max(scores_apovsholo$PC2) + pad_y
 )
+shared_h <- c(
+  MASS::bandwidth.nrd(scores_apovsholo$PC1),
+  MASS::bandwidth.nrd(scores_apovsholo$PC2)
+)
 
 # function to calculate delta G
-# set +5 kcal/mol as the upper limit as beyond that it's very rare, highly unfavorable conformations
-calc_fel <- function(sub_df, state_name, max_dG = 5.0) {
-  kde <- kde2d(x = sub_df$PC1, y = sub_df$PC2, n = 300, lims = shared_lims)
+# set +6 kcal/mol as the upper limit as beyond that it's very rare, highly unfavorable conformations
+calc_fel <- function(sub_df, state_name, max_dG = 6.0) {
+  kde <- MASS::kde2d(
+    x = sub_df$PC1,
+    y = sub_df$PC2,
+    n = 300,
+    lims = shared_lims,
+    h = shared_h
+  )
   grid <- expand.grid(PC1 = kde$x, PC2 = kde$y)
   grid$density <- as.vector(kde$z)
   grid$dG <- -kBT * log(grid$density / max(grid$density))
@@ -30,8 +41,8 @@ calc_fel <- function(sub_df, state_name, max_dG = 5.0) {
 }
 
 # calculate delta G for apo and holo
-fel_apo  <- calc_fel(scores_apovsholo[scores_apovsholo$state == "Apo", ],  "Apo",  max_dG = 5.0)
-fel_holo <- calc_fel(scores_apovsholo[scores_apovsholo$state == "Holo", ], "Holo", max_dG = 5.0)
+fel_apo  <- calc_fel(scores_apovsholo[scores_apovsholo$state == 'Apo', ],  'Apo',  max_dG = 6.0)
+fel_holo <- calc_fel(scores_apovsholo[scores_apovsholo$state == 'Holo', ], 'Holo', max_dG = 6.0)
 fel_all  <- rbind(fel_apo, fel_holo)
 
 # total variance accounted for by each principal component
@@ -39,62 +50,97 @@ var_exp_apovsholo <- round(100 * pc_apovsholo$L / sum(pc_apovsholo$L), 1)
 
 # plot free energy landscape in 2D
 # conformational basin representing the global minimum = very dark blue, more and more unfavorable = closer to green, yellow, then red
-ggplot(fel_all, aes(x = PC1, y = PC2, z = dG_capped)) + geom_raster(aes(fill = dG_capped), interpolate = TRUE) + geom_contour(color = "white", alpha = 0.45, linewidth = 0.35, bins = 10) + facet_wrap(~ state) + scale_fill_viridis_c(option = "turbo", direction = 1, na.value  = "white", name = expression(Delta*G~"(kcal/mol)")) + labs(x = paste0("PC1 (", var_exp_apovsholo[1], "% variance)"), y = paste0("PC2 (", var_exp_apovsholo[2], "% variance)")) + theme_classic()
+ggplot(fel_all, aes(x = PC1, y = PC2, z = dG_capped)) + geom_raster(aes(fill = dG_capped), interpolate = TRUE) + geom_contour(color = 'white', alpha = 0.45, linewidth = 0.35, bins = 10) + facet_wrap(~ state) + scale_fill_viridis_c(option = 'turbo', direction = 1, na.value  = 'white', name = expression(Delta*G~'(kcal/mol)')) + labs(x = paste0('PC1 (', var_exp_apovsholo[1], '% variance)'), y = paste0('PC2 (', var_exp_apovsholo[2], '% variance)')) + theme_classic()
 
 # export
-ggsave('fel_2d_cf_v1.eps', height=6, width=13, dpi=300, device=cairo_ps)
+ggsave('fel_2d_cf_v2.eps', height=6, width=13, dpi=300, device=cairo_ps)
 
 # plot free energy landscape in 3D using plot3D which is easier than using plotly if you want to compare apo vs holo simultaneously
 library(plot3D)
 
 # first define a function that calculates delta G for holo and apo so it can be represented as a third axis
 # then graph using persp3D, setting the same angles and axis limits so that holo and apo are viewed from the same perspective
-plot_state_3d <- function(state_name, panel_title, show_colkey = FALSE) {
+# also graphing the 2D projection onto the xy plane plus its contour lines, meaning the 2D graph above alone is no longer necessary
+plot_state_3d <- function(state_name, panel_title, show_colkey = FALSE, max_dG = 6.0) {
   sub_df <- scores_apovsholo[scores_apovsholo$state == state_name, ]
-  kde <- kde2d(x = sub_df$PC1, y = sub_df$PC2, n = 200, lims = shared_lims)
+
+  kde <- MASS::kde2d(
+    x = sub_df$PC1,
+    y = sub_df$PC2,
+    n = 200,
+    lims = shared_lims,
+    h = shared_h
+  )
   
   dG_mat <- -kBT * log(kde$z / max(kde$z))
-  dG_mat[dG_mat > 5.0] <- NA
-  
-  persp3D(
+  dG_mat[dG_mat > max_dG] <- NA
+
+  z_floor <- -1.5
+  pal <- viridisLite::turbo(100)
+
+  plot3D::image3D(
     x = kde$x,
     y = kde$y,
-    z = dG_mat,
-    col = viridisLite::turbo(100),
-    clim = c(0, 5),
+    z = z_floor,
+    colvar = dG_mat,
+    col = pal,
+    clim = c(0, max_dG),
+    NAcol = "transparent",
     xlim = shared_lims[1:2],
     ylim = shared_lims[3:4],
-    zlim = c(0, 5),
+    zlim = c(z_floor, max_dG),
     theta = 40,
     phi = 30,
     expand = 0.6,
-    border = NA,
-    shade = 0.25,
     ticktype = "detailed",
-    colkey = if (show_colkey) list(length = 0.5, width = 0.8) else FALSE,
+    colkey = FALSE,
     xlab = paste0("PC1 (", var_exp_apovsholo[1], "%)"),
     ylab = paste0("PC2 (", var_exp_apovsholo[2], "%)"),
     zlab = "Delta G (kcal/mol)",
-    clab = c("Delta G", "(kcal/mol)"),
     main = panel_title
+  )
+
+  plot3D::contour3D(
+    x = kde$x,
+    y = kde$y,
+    z = z_floor + 0.02,
+    colvar = dG_mat,
+    levels = seq(0.5, max_dG - 0.5, by = 0.5),
+    col = "white",
+    lwd = 0.8,
+    add = TRUE,
+    colkey = FALSE
+  )
+
+  plot3D::persp3D(
+    x = kde$x,
+    y = kde$y,
+    z = dG_mat,
+    col = pal,
+    clim = c(0, max_dG),
+    border = NA,
+    shade = 0.25,
+    add = TRUE,
+    colkey = if (show_colkey) list(length = 0.5, width = 0.8) else FALSE,
+    clab = c("Delta G", "(kcal/mol)")
   )
 }
 
 # unlike ggplot it won't show in rstudio so you can export as png to quickly take a look
-png("fel_3d_cf_v1.png", width = 3600, height = 1800, res = 300)
+png('fel_3d_cf_v1.png', width = 3600, height = 1800, res = 300)
 # par sets graphical parameters for plotting. mfrow divides the canvas into a 1 row by 2 column grid so the plots show side by side
 # mar shrinks the margins around each panel. the defaults are bigger, so this makes it have less white space
 par(mfrow = c(1, 2), mar = c(2, 2, 3, 2))
 # calls the function defined earlier, calculating delta G for apo, naming the plot apo, and then not showing the key on apo since you only need it once per panel
-plot_state_3d("Apo",  "Apo",  show_colkey = FALSE)
+plot_state_3d('Apo',  'Apo',  show_colkey = FALSE)
 # calls the function for the holo data
-plot_state_3d("Holo", "Holo", show_colkey = TRUE)
+plot_state_3d('Holo', 'Holo', show_colkey = TRUE)
 # executes the graphing instructions. must do this or else the plot won't export at all
 dev.off()
 
 # and exporting for publication you need a vector image, so export as eps. same parameters as above for png
-cairo_ps("fel_3d_cf_v1.eps", width = 12, height = 6, fallback_resolution = 600)
+cairo_ps('fel_3d_cf_v1.eps', width = 12, height = 6, fallback_resolution = 600)
 par(mfrow = c(1, 2), mar = c(2, 2, 3, 2))
-plot_state_3d("Apo",  "Apo",  show_colkey = FALSE)
-plot_state_3d("Holo", "Holo", show_colkey = TRUE)
+plot_state_3d('Apo',  'Apo',  show_colkey = FALSE)
+plot_state_3d('Holo', 'Holo', show_colkey = TRUE)
 dev.off()
